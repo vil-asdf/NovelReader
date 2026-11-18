@@ -2,6 +2,7 @@ const STORAGE_KEY = 'novel_reader_state_v1';
 
 let bookData = null;
 let currentTab = 'all';
+let homeFilter = 'all';
 let state = {
   view: 'welcome',
   currentChapter: 1,
@@ -56,6 +57,219 @@ function applyPreferences() {
   document.getElementById('font-size-val').textContent = state.fontSize;
 }
 
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+async function downloadAllChaptersAsEpub() {
+  if (!bookData || !bookData.chapters || bookData.chapters.length === 0) {
+    alert('No chapters available to export.');
+    return;
+  }
+
+  if (typeof JSZip === 'undefined') {
+    alert('EPUB generator library (JSZip) is still loading or unavailable.');
+    return;
+  }
+
+  const btns = [
+    document.getElementById('download-epub-btn'),
+    document.getElementById('hero-download-epub-btn')
+  ].filter(Boolean);
+
+  btns.forEach(b => {
+    b.disabled = true;
+    b.textContent = '⏳ Generating EPUB...';
+  });
+
+  try {
+    const zip = new JSZip();
+    const title = bookData.title || 'Surviving the Game as a Barbarian';
+    const author = bookData.author || 'Jung Yoon-kang';
+    const synopsis = bookData.synopsis || '';
+    const bookId = 'urn:uuid:surviving-the-game-as-a-barbarian-en';
+
+    // 1. mimetype (must be first and uncompressed)
+    zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+
+    // 2. META-INF/container.xml
+    zip.folder('META-INF').file(
+      'container.xml',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+    );
+
+    const oebps = zip.folder('OEBPS');
+
+    // Stylesheet inside EPUB
+    oebps.file(
+      'style.css',
+      `body { font-family: Georgia, serif; line-height: 1.7; margin: 5%; }
+h1, h2 { text-align: center; margin-bottom: 1em; }
+p { text-indent: 1.2em; margin-bottom: 0.8em; text-align: justify; }`
+    );
+
+    // Optional cover image if present on server
+    let hasCover = false;
+    try {
+      const coverRes = await fetch('cover.jpg');
+      if (coverRes.ok) {
+        const coverBlob = await coverRes.blob();
+        oebps.file('cover.jpg', coverBlob);
+        hasCover = true;
+      }
+    } catch (_) {}
+
+    let manifestItems = `    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="css" href="style.css" media-type="text/css"/>
+`;
+
+    if (hasCover) {
+      manifestItems += `    <item id="cover-img" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+`;
+    }
+
+    let spineItems = '';
+    let navListItems = '';
+    let ncxNavPoints = '';
+
+    bookData.chapters.forEach((ch, index) => {
+      const idx = index + 1;
+      const filename = `chapter_${String(idx).padStart(4, '0')}.xhtml`;
+      const itemId = `chap_${idx}`;
+      const chapHeading = `Chapter ${ch.number}: ${ch.title}`;
+
+      const paragraphsHtml = (ch.paragraphs || [])
+        .map(p => `    <p>${escapeXml(p)}</p>`)
+        .join('
+');
+
+      const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeXml(chapHeading)}</title>
+  <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body>
+  <h2>${escapeXml(chapHeading)}</h2>
+${paragraphsHtml}
+</body>
+</html>`;
+
+      oebps.file(filename, xhtml);
+
+      manifestItems += `    <item id="${itemId}" href="${filename}" media-type="application/xhtml+xml"/>
+`;
+      spineItems += `    <itemref idref="${itemId}"/>
+`;
+      navListItems += `      <li><a href="${filename}">${escapeXml(chapHeading)}</a></li>
+`;
+      ncxNavPoints += `    <navPoint id="navPoint-${idx}" playOrder="${idx}">
+      <navLabel><text>${escapeXml(chapHeading)}</text></navLabel>
+      <content src="${filename}"/>
+    </navPoint>
+`;
+    });
+
+    // EPUB 3 Navigation Document
+    oebps.file(
+      'nav.xhtml',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Table of Contents</title>
+</head>
+<body>
+  <nav epub:type="toc" id="toc">
+    <h1>Table of Contents</h1>
+    <ol>
+${navListItems}    </ol>
+  </nav>
+</body>
+</html>`
+    );
+
+    // EPUB 2 NCX for backward compatibility
+    oebps.file(
+      'toc.ncx',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="${bookId}"/>
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle><text>${escapeXml(title)}</text></docTitle>
+  <navMap>
+${ncxNavPoints}  </navMap>
+</ncx>`
+    );
+
+    // content.opf
+    const nowIso = new Date().toISOString().split('.')[0] + 'Z';
+    oebps.file(
+      'content.opf',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="BookId">${bookId}</dc:identifier>
+    <dc:title>${escapeXml(title)}</dc:title>
+    <dc:creator>${escapeXml(author)}</dc:creator>
+    <dc:language>en</dc:language>
+    <dc:description>${escapeXml(synopsis)}</dc:description>
+    <meta property="dcterms:modified">${nowIso}</meta>
+  </metadata>
+  <manifest>
+${manifestItems}  </manifest>
+  <spine toc="ncx">
+${spineItems}  </spine>
+</package>`
+    );
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/epub+zip'
+    });
+
+    const safeFilename = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'novel';
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeFilename}.epub`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error generating EPUB:', err);
+    alert('Failed to generate EPUB file. Check console for details.');
+  } finally {
+    btns.forEach(b => {
+      b.disabled = false;
+      b.textContent = '⬇ Download EPUB';
+    });
+  }
+}
+
 function updateProgressUI() {
   if (!bookData) return;
   const total = bookData.chapters.length;
@@ -77,17 +291,23 @@ function updateProgressUI() {
   }
 }
 
+function getFilteredChapters(filter) {
+  if (!bookData) return [];
+  if (filter === 'bookmarks') {
+    return bookData.chapters.filter(c => state.bookmarks.includes(c.number));
+  }
+  if (filter === 'unread') {
+    return bookData.chapters.filter(c => !state.readChapters.includes(c.number));
+  }
+  return bookData.chapters;
+}
+
 function renderChapterList(filter = currentTab) {
   currentTab = filter;
   const list = document.getElementById('chapter-list');
   list.innerHTML = '';
 
-  let chapters = bookData.chapters;
-  if (filter === 'bookmarks') {
-    chapters = bookData.chapters.filter(c => state.bookmarks.includes(c.number));
-  } else if (filter === 'unread') {
-    chapters = bookData.chapters.filter(c => !state.readChapters.includes(c.number));
-  }
+  const chapters = getFilteredChapters(filter);
 
   if (chapters.length === 0) {
     const empty = document.createElement('li');
@@ -123,6 +343,52 @@ function renderChapterList(filter = currentTab) {
   });
 }
 
+function renderHomeChapterGrid(filter = homeFilter) {
+  homeFilter = filter;
+  const grid = document.getElementById('home-chapter-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const chapters = getFilteredChapters(filter);
+  if (chapters.length === 0) {
+    grid.innerHTML = '<p class="subtitle">No chapters in this filter.</p>';
+    return;
+  }
+
+  chapters.forEach(ch => {
+    const isRead = state.readChapters.includes(ch.number);
+    const isBookmarked = state.bookmarks.includes(ch.number);
+    const isLastRead = state.lastReadChapter === ch.number;
+
+    const card = document.createElement('div');
+    card.className = 'home-chap-card';
+    if (isRead) card.classList.add('is-read');
+    if (isLastRead) card.classList.add('is-last-read');
+
+    const info = document.createElement('div');
+    const numEl = document.createElement('span');
+    numEl.className = 'home-chap-num';
+    numEl.textContent = `Chapter ${ch.number}${isLastRead ? ' • Last Read' : ''}`;
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'home-chap-name';
+    nameEl.textContent = ch.title;
+
+    info.appendChild(numEl);
+    info.appendChild(nameEl);
+
+    const badges = document.createElement('span');
+    badges.className = 'home-chap-badges';
+    badges.textContent = `${isBookmarked ? '★ ' : ''}${isRead ? '✓' : ''}`.trim();
+
+    card.appendChild(info);
+    card.appendChild(badges);
+
+    card.addEventListener('click', () => openChapter(ch.number));
+    grid.appendChild(card);
+  });
+}
+
 function updateChapterStatusControls() {
   const isBookmarked = state.bookmarks.includes(state.currentChapter);
   document.getElementById('bookmark-btn').textContent = isBookmarked ? '★' : '☆';
@@ -141,7 +407,7 @@ function showWelcome() {
   saveState();
 
   document.getElementById('welcome-screen').classList.remove('hidden');
-  document.getElementById('reader-view').classList.add('hidden');
+  document.getElementById('reader-container').classList.add('hidden');
   document.getElementById('home-btn').classList.add('hidden');
   document.getElementById('mark-read-btn').classList.add('hidden');
 
@@ -160,6 +426,7 @@ function showWelcome() {
   }
 
   updateProgressUI();
+  renderHomeChapterGrid();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -178,7 +445,7 @@ function openChapter(chapterNum) {
   saveState();
 
   document.getElementById('welcome-screen').classList.add('hidden');
-  document.getElementById('reader-view').classList.remove('hidden');
+  document.getElementById('reader-container').classList.remove('hidden');
   document.getElementById('home-btn').classList.remove('hidden');
   document.getElementById('mark-read-btn').classList.remove('hidden');
 
@@ -216,18 +483,23 @@ async function init() {
     return;
   }
 
-  document.title = `${bookData.title} — Reader`;
-  document.getElementById('novel-title').textContent = bookData.title;
-  document.getElementById('novel-author').textContent = bookData.author;
-  document.getElementById('welcome-title').textContent = bookData.title;
-  document.getElementById('welcome-author').textContent = `By ${bookData.author}`;
-  document.getElementById('welcome-synopsis').textContent = bookData.synopsis;
+  if (bookData.title && bookData.title !== 'Untitled Novel (English Edition)') {
+    document.title = `${bookData.title} — Reader`;
+    document.getElementById('novel-title').textContent = bookData.title;
+    document.getElementById('welcome-title').textContent = bookData.title;
+  }
+  if (bookData.author && bookData.author !== 'Author Name') {
+    document.getElementById('novel-author').textContent = bookData.author;
+    document.getElementById('welcome-author').textContent = bookData.author;
+  }
 
   updateProgressUI();
   renderChapterList();
-
-  // Always start on the cover/welcome screen when opening the site so the user sees read markers and "Continue Reading"
+  renderHomeChapterGrid();
   showWelcome();
+
+  document.getElementById('download-epub-btn').addEventListener('click', downloadAllChaptersAsEpub);
+  document.getElementById('hero-download-epub-btn').addEventListener('click', downloadAllChaptersAsEpub);
 
   document.getElementById('continue-reading-btn').addEventListener('click', () => {
     openChapter(state.lastReadChapter || state.currentChapter || 1);
@@ -302,6 +574,7 @@ async function init() {
     updateChapterStatusControls();
     updateProgressUI();
     renderChapterList();
+    renderHomeChapterGrid();
     saveState();
   });
 
@@ -314,6 +587,7 @@ async function init() {
     }
     updateChapterStatusControls();
     renderChapterList();
+    renderHomeChapterGrid();
     saveState();
   });
 
@@ -322,6 +596,14 @@ async function init() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       renderChapterList(btn.dataset.tab);
+    });
+  });
+
+  document.querySelectorAll('.pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderHomeChapterGrid(btn.dataset.homeFilter);
     });
   });
 }
