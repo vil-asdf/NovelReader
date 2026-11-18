@@ -1,8 +1,13 @@
 const STORAGE_KEY = 'novel_reader_state_v1';
+const HOME_PAGE_SIZE = 60;
 
 let bookData = null;
 let currentTab = 'all';
 let homeFilter = 'all';
+let sidebarSearchQuery = '';
+let homeSearchQuery = '';
+let homeVisibleLimit = HOME_PAGE_SIZE;
+
 let state = {
   view: 'welcome',
   currentChapter: 1,
@@ -84,7 +89,7 @@ async function downloadAllChaptersAsEpub() {
 
   btns.forEach(b => {
     b.disabled = true;
-    b.textContent = '⏳ Generating EPUB...';
+    b.textContent = '⏳ Packaging 823 Chapters...';
   });
 
   try {
@@ -92,12 +97,10 @@ async function downloadAllChaptersAsEpub() {
     const title = bookData.title || 'Surviving the Game as a Barbarian';
     const author = bookData.author || 'Jung Yoon-kang';
     const synopsis = bookData.synopsis || '';
-    const bookId = 'urn:uuid:surviving-the-game-as-a-barbarian-en';
+    const bookId = 'urn:uuid:surviving-the-game-as-a-barbarian-en-1-823';
 
-    // 1. mimetype (must be first and uncompressed)
     zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
 
-    // 2. META-INF/container.xml
     zip.folder('META-INF').file(
       'container.xml',
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -110,7 +113,6 @@ async function downloadAllChaptersAsEpub() {
 
     const oebps = zip.folder('OEBPS');
 
-    // Stylesheet inside EPUB
     oebps.file(
       'style.css',
       `body { font-family: Georgia, serif; line-height: 1.7; margin: 5%; }
@@ -118,7 +120,6 @@ h1, h2 { text-align: center; margin-bottom: 1em; }
 p { text-indent: 1.2em; margin-bottom: 0.8em; text-align: justify; }`
     );
 
-    // Optional cover image if present on server
     let hasCover = false;
     try {
       const coverRes = await fetch('cover.jpg');
@@ -151,8 +152,7 @@ p { text-indent: 1.2em; margin-bottom: 0.8em; text-align: justify; }`
 
       const paragraphsHtml = (ch.paragraphs || [])
         .map(p => `    <p>${escapeXml(p)}</p>`)
-        .join('
-');
+        .join('\n');
 
       const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -183,7 +183,6 @@ ${paragraphsHtml}
 `;
     });
 
-    // EPUB 3 Navigation Document
     oebps.file(
       'nav.xhtml',
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -203,7 +202,6 @@ ${navListItems}    </ol>
 </html>`
     );
 
-    // EPUB 2 NCX for backward compatibility
     oebps.file(
       'toc.ncx',
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -220,7 +218,6 @@ ${ncxNavPoints}  </navMap>
 </ncx>`
     );
 
-    // content.opf
     const nowIso = new Date().toISOString().split('.')[0] + 'Z';
     oebps.file(
       'content.opf',
@@ -243,7 +240,9 @@ ${spineItems}  </spine>
 
     const blob = await zip.generateAsync({
       type: 'blob',
-      mimeType: 'application/epub+zip'
+      mimeType: 'application/epub+zip',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
     });
 
     const safeFilename = title
@@ -254,7 +253,7 @@ ${spineItems}  </spine>
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${safeFilename}.epub`;
+    a.download = `${safeFilename}-1-823.epub`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -291,15 +290,25 @@ function updateProgressUI() {
   }
 }
 
-function getFilteredChapters(filter) {
+function getFilteredChapters(filter, searchQuery = '') {
   if (!bookData) return [];
+  let list = bookData.chapters;
+
   if (filter === 'bookmarks') {
-    return bookData.chapters.filter(c => state.bookmarks.includes(c.number));
+    list = list.filter(c => state.bookmarks.includes(c.number));
+  } else if (filter === 'unread') {
+    list = list.filter(c => !state.readChapters.includes(c.number));
   }
-  if (filter === 'unread') {
-    return bookData.chapters.filter(c => !state.readChapters.includes(c.number));
+
+  const q = searchQuery.trim().toLowerCase();
+  if (q) {
+    list = list.filter(c =>
+      String(c.number).includes(q) ||
+      `chapter ${c.number}`.includes(q) ||
+      (c.title && c.title.toLowerCase().includes(q))
+    );
   }
-  return bookData.chapters;
+  return list;
 }
 
 function renderChapterList(filter = currentTab) {
@@ -307,7 +316,7 @@ function renderChapterList(filter = currentTab) {
   const list = document.getElementById('chapter-list');
   list.innerHTML = '';
 
-  const chapters = getFilteredChapters(filter);
+  const chapters = getFilteredChapters(filter, sidebarSearchQuery);
 
   if (chapters.length === 0) {
     const empty = document.createElement('li');
@@ -316,6 +325,7 @@ function renderChapterList(filter = currentTab) {
     return;
   }
 
+  const frag = document.createDocumentFragment();
   chapters.forEach(ch => {
     const li = document.createElement('li');
     const isRead = state.readChapters.includes(ch.number);
@@ -339,23 +349,38 @@ function renderChapterList(filter = currentTab) {
       openChapter(ch.number);
       document.getElementById('sidebar').classList.add('hidden');
     });
-    list.appendChild(li);
+    frag.appendChild(li);
   });
+  list.appendChild(frag);
 }
 
-function renderHomeChapterGrid(filter = homeFilter) {
+function renderHomeChapterGrid(filter = homeFilter, resetLimit = false) {
+  if (resetLimit) {
+    homeVisibleLimit = HOME_PAGE_SIZE;
+  }
   homeFilter = filter;
   const grid = document.getElementById('home-chapter-grid');
+  const countEl = document.getElementById('home-chapter-count');
+  const paginationEl = document.getElementById('home-pagination');
+  const loadMoreBtn = document.getElementById('home-load-more-btn');
   if (!grid) return;
   grid.innerHTML = '';
 
-  const chapters = getFilteredChapters(filter);
+  const chapters = getFilteredChapters(filter, homeSearchQuery);
+  if (countEl) {
+    countEl.textContent = `${chapters.length} chapter${chapters.length === 1 ? '' : 's'}`;
+  }
+
   if (chapters.length === 0) {
-    grid.innerHTML = '<p class="subtitle">No chapters in this filter.</p>';
+    grid.innerHTML = '<p class="subtitle">No chapters match this filter.</p>';
+    if (paginationEl) paginationEl.classList.add('hidden');
     return;
   }
 
-  chapters.forEach(ch => {
+  const visibleChapters = chapters.slice(0, homeVisibleLimit);
+  const frag = document.createDocumentFragment();
+
+  visibleChapters.forEach(ch => {
     const isRead = state.readChapters.includes(ch.number);
     const isBookmarked = state.bookmarks.includes(ch.number);
     const isLastRead = state.lastReadChapter === ch.number;
@@ -385,8 +410,20 @@ function renderHomeChapterGrid(filter = homeFilter) {
     card.appendChild(badges);
 
     card.addEventListener('click', () => openChapter(ch.number));
-    grid.appendChild(card);
+    frag.appendChild(card);
   });
+
+  grid.appendChild(frag);
+
+  if (paginationEl && loadMoreBtn) {
+    if (chapters.length > homeVisibleLimit) {
+      paginationEl.classList.remove('hidden');
+      const remaining = chapters.length - homeVisibleLimit;
+      loadMoreBtn.textContent = `Load More (${remaining} remaining)`;
+    } else {
+      paginationEl.classList.add('hidden');
+    }
+  }
 }
 
 function updateChapterStatusControls() {
@@ -410,6 +447,7 @@ function showWelcome() {
   document.getElementById('reader-container').classList.add('hidden');
   document.getElementById('home-btn').classList.add('hidden');
   document.getElementById('mark-read-btn').classList.add('hidden');
+  document.getElementById('bookmark-btn').classList.add('hidden');
 
   const continueBtn = document.getElementById('continue-reading-btn');
   const startBtn = document.getElementById('start-reading-btn');
@@ -448,17 +486,20 @@ function openChapter(chapterNum) {
   document.getElementById('reader-container').classList.remove('hidden');
   document.getElementById('home-btn').classList.remove('hidden');
   document.getElementById('mark-read-btn').classList.remove('hidden');
+  document.getElementById('bookmark-btn').classList.remove('hidden');
 
   document.getElementById('chapter-number').textContent = `Chapter ${chapter.number}`;
   document.getElementById('chapter-title').textContent = chapter.title;
 
   const contentEl = document.getElementById('chapter-content');
   contentEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
   chapter.paragraphs.forEach(text => {
     const p = document.createElement('p');
     p.textContent = text;
-    contentEl.appendChild(p);
+    frag.appendChild(p);
   });
+  contentEl.appendChild(frag);
 
   const idx = bookData.chapters.findIndex(c => c.number === chapter.number);
   document.getElementById('prev-chapter').disabled = idx <= 0;
@@ -495,7 +536,7 @@ async function init() {
 
   updateProgressUI();
   renderChapterList();
-  renderHomeChapterGrid();
+  renderHomeChapterGrid(homeFilter, true);
   showWelcome();
 
   document.getElementById('download-epub-btn').addEventListener('click', downloadAllChaptersAsEpub);
@@ -523,7 +564,12 @@ async function init() {
   });
 
   document.getElementById('toggle-sidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('hidden');
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('hidden');
+    if (!sidebar.classList.contains('hidden')) {
+      const activeItem = sidebar.querySelector('li.active');
+      if (activeItem) activeItem.scrollIntoView({ block: 'center' });
+    }
   });
 
   document.getElementById('close-sidebar').addEventListener('click', () => {
@@ -603,8 +649,23 @@ async function init() {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderHomeChapterGrid(btn.dataset.homeFilter);
+      renderHomeChapterGrid(btn.dataset.homeFilter, true);
     });
+  });
+
+  document.getElementById('sidebar-search-input').addEventListener('input', (e) => {
+    sidebarSearchQuery = e.target.value;
+    renderChapterList(currentTab);
+  });
+
+  document.getElementById('home-search-input').addEventListener('input', (e) => {
+    homeSearchQuery = e.target.value;
+    renderHomeChapterGrid(homeFilter, true);
+  });
+
+  document.getElementById('home-load-more-btn').addEventListener('click', () => {
+    homeVisibleLimit += HOME_PAGE_SIZE;
+    renderHomeChapterGrid(homeFilter, false);
   });
 }
 

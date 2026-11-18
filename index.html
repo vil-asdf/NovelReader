@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Surviving the Game as a Barbarian — Novel Reader</title>
+  <link rel="icon" type="image/jpeg" href="cover.jpg" />
   <link rel="stylesheet" href="style.css" />
   <!-- JSZip for client-side EPUB generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -21,7 +22,7 @@
     <div class="topbar-right">
       <button id="download-epub-btn" class="icon-btn accent-outline" title="Download all chapters as EPUB">⬇ Download EPUB</button>
       <button id="mark-read-btn" class="icon-btn hidden" title="Toggle Read Status" aria-label="Toggle Read Status">✓ Read</button>
-      <button id="bookmark-btn" class="icon-btn" title="Bookmark Chapter" aria-label="Bookmark Chapter">☆</button>
+      <button id="bookmark-btn" class="icon-btn hidden" title="Bookmark Chapter" aria-label="Bookmark Chapter">☆</button>
       <button id="toggle-settings" class="icon-btn" title="Reader Settings" aria-label="Reader Settings">Aa</button>
     </div>
   </header>
@@ -58,7 +59,10 @@
         <h2>Chapters</h2>
         <button id="close-sidebar" class="icon-btn" aria-label="Close">✕</button>
       </div>
-      <div id="reading-stats" class="reading-stats">0 / 0 read (0%)</div>
+      <div id="reading-stats" class="reading-stats">0 / 823 read (0%)</div>
+      <div class="sidebar-search">
+        <input type="search" id="sidebar-search-input" placeholder="Search 823 chapters..." aria-label="Search chapters" />
+      </div>
       <div class="sidebar-tabs">
         <button class="tab-btn active" data-tab="all">All</button>
         <button class="tab-btn" data-tab="unread">Unread</button>
@@ -68,7 +72,7 @@
     </aside>
 
     <main id="main-wrapper">
-      <!-- Homepage / Hero Landing View (inspired by twatf.pages.dev) -->
+      <!-- Homepage / Hero Landing View -->
       <div id="welcome-screen" class="home-view">
         <section class="hero-section">
           <div id="hero-bg" class="hero-bg"></div>
@@ -76,7 +80,7 @@
 
           <div class="hero-content">
             <div class="cover-card">
-              <img id="cover-image" src="cover.png" alt="Surviving the Game as a Barbarian Cover" onerror="this.style.display='none'; document.getElementById('cover-fallback').classList.remove('hidden');" />
+              <img id="cover-image" src="cover.jpg" alt="Surviving the Game as a Barbarian Cover" onerror="this.style.display='none'; document.getElementById('cover-fallback').classList.remove('hidden');" />
               <div id="cover-fallback" class="cover-fallback hidden">
                 <span>SURVIVING THE GAME AS A BARBARIAN</span>
               </div>
@@ -85,7 +89,8 @@
             <div class="hero-info">
               <div class="badge-row">
                 <span class="meta-badge">Korean Web Novel</span>
-                <span class="meta-badge">Ongoing • Naver Series</span>
+                <span class="meta-badge">Chapters 1–823</span>
+                <span class="meta-badge">Naver Series</span>
               </div>
 
               <h2 id="welcome-title">Surviving the Game as a Barbarian</h2>
@@ -125,14 +130,23 @@
         <!-- Quick Chapter Directory on Homepage -->
         <section class="home-chapters-section">
           <div class="home-chapters-header">
-            <h3>Chapter List</h3>
-            <div class="home-filter-pills">
-              <button class="pill-btn active" data-home-filter="all">All</button>
-              <button class="pill-btn" data-home-filter="unread">Unread</button>
-              <button class="pill-btn" data-home-filter="bookmarks">Bookmarks</button>
+            <div class="home-chapters-title-wrap">
+              <h3>Chapter List</h3>
+              <span id="home-chapter-count" class="subtitle">823 chapters</span>
+            </div>
+            <div class="home-controls-right">
+              <input type="search" id="home-search-input" class="search-input" placeholder="Search chapter # or title..." aria-label="Search chapter directory" />
+              <div class="home-filter-pills">
+                <button class="pill-btn active" data-home-filter="all">All</button>
+                <button class="pill-btn" data-home-filter="unread">Unread</button>
+                <button class="pill-btn" data-home-filter="bookmarks">Bookmarks</button>
+              </div>
             </div>
           </div>
           <div id="home-chapter-grid" class="home-chapter-grid"></div>
+          <div id="home-pagination" class="home-pagination hidden">
+            <button id="home-load-more-btn" class="secondary-btn">Load More Chapters</button>
+          </div>
         </section>
       </div>
 
@@ -151,7 +165,7 @@
             <button id="prev-chapter" class="nav-btn">← Previous</button>
             <div class="nav-center">
               <button id="footer-home-btn" class="secondary-btn">⌂ Home</button>
-              <span id="progress-indicator" class="progress-text">1 / 1</span>
+              <span id="progress-indicator" class="progress-text">1 / 823</span>
             </div>
             <button id="next-chapter" class="nav-btn">Next →</button>
           </nav>

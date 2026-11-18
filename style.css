@@ -631,3 +631,52 @@ select {
     display: none;
   }
 }
+
+
+/* Search Inputs & Pagination for 823-Chapter Directory */
+.sidebar-search {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+.sidebar-search input,
+.search-input {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sidebar-search input:focus,
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+.home-chapters-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+.home-controls-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.home-controls-right .search-input {
+  width: 220px;
+}
+
+.home-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
