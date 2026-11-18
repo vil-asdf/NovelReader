@@ -43,12 +43,13 @@ This is an actively maintained, living project. Because flagship titles in our c
 
 Keeping an independent, ad-free platform running and regularly updated takes time, careful text curation, and ongoing technical maintenance. 
 
-If this reader has made your literary journey more enjoyable and you would like to help keep the project free, active, and growing with new chapters, consider supporting our work:
+If this reader has made your literary journey more enjoyable and you would like to help keep the project free, active, and growing with new chapters, consider buying me a coffee! Every contribution goes directly toward project maintenance, text quality assurance, and expanding the catalog:
 
-> 🚧 **Donation Channels — Coming Soon!**
-> *We are currently setting up official support links (Ko-fi / Buy Me a Coffee / Pix). Check back soon or star/watch this repository for updates!*
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20the%20Project-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/vil_asdf)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20on%20Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/vilasdf)
 
-*(All contributions go directly toward project maintenance, text quality assurance, and expanding the catalog.)*
+* **Buy Me a Coffee:** [buymeacoffee.com/vil_asdf](https://buymeacoffee.com/vil_asdf)
+* **Ko-fi:** [ko-fi.com/vilasdf](https://ko-fi.com/vilasdf)
 
 ---
 
