@@ -10,12 +10,14 @@
   <header class="topbar">
     <div class="topbar-left">
       <button id="toggle-sidebar" class="icon-btn" title="Table of Contents" aria-label="Table of Contents">☰</button>
+      <button id="home-btn" class="icon-btn hidden" title="Back to Cover" aria-label="Back to Cover">⌂ Home</button>
       <div class="book-meta">
         <h1 id="novel-title">Novel Title</h1>
         <span id="novel-author" class="subtitle">Author Name</span>
       </div>
     </div>
     <div class="topbar-right">
+      <button id="mark-read-btn" class="icon-btn hidden" title="Toggle Read Status" aria-label="Toggle Read Status">✓ Read</button>
       <button id="bookmark-btn" class="icon-btn" title="Bookmark Chapter" aria-label="Bookmark Chapter">☆</button>
       <button id="toggle-settings" class="icon-btn" title="Reader Settings" aria-label="Reader Settings">Aa</button>
     </div>
@@ -53,8 +55,10 @@
         <h2>Chapters</h2>
         <button id="close-sidebar" class="icon-btn" aria-label="Close">✕</button>
       </div>
+      <div id="reading-stats" class="reading-stats">0 / 0 read (0%)</div>
       <div class="sidebar-tabs">
         <button class="tab-btn active" data-tab="all">All</button>
+        <button class="tab-btn" data-tab="unread">Unread</button>
         <button class="tab-btn" data-tab="bookmarks">Bookmarks</button>
       </div>
       <ul id="chapter-list" class="chapter-list"></ul>
@@ -65,18 +69,35 @@
         <h2 id="welcome-title">Novel Title</h2>
         <p id="welcome-author" class="subtitle">By Author Name</p>
         <p id="welcome-synopsis" class="synopsis">Synopsis will appear here once configured in data/chapters.json.</p>
-        <button id="start-reading-btn" class="primary-btn">Start Reading</button>
+        
+        <div id="progress-summary" class="progress-summary hidden">
+          <span id="welcome-progress-text"></span>
+          <div class="progress-bar-bg">
+            <div id="welcome-progress-fill" class="progress-bar-fill"></div>
+          </div>
+        </div>
+
+        <div class="welcome-actions">
+          <button id="continue-reading-btn" class="primary-btn hidden">Continue Reading</button>
+          <button id="start-reading-btn" class="primary-btn">Start Reading</button>
+        </div>
       </div>
 
       <article id="reader-view" class="reader-view hidden">
         <div class="chapter-header">
-          <span id="chapter-number" class="chapter-tag">Chapter 1</span>
+          <div class="chapter-header-top">
+            <span id="chapter-number" class="chapter-tag">Chapter 1</span>
+            <span id="chapter-read-badge" class="read-badge hidden">✓ Read</span>
+          </div>
           <h2 id="chapter-title">Chapter Title</h2>
         </div>
         <div id="chapter-content" class="chapter-content"></div>
         <nav class="chapter-nav">
           <button id="prev-chapter" class="nav-btn">← Previous</button>
-          <span id="progress-indicator" class="progress-text">1 / 1</span>
+          <div class="nav-center">
+            <button id="footer-home-btn" class="secondary-btn">⌂ Home</button>
+            <span id="progress-indicator" class="progress-text">1 / 1</span>
+          </div>
           <button id="next-chapter" class="nav-btn">Next →</button>
         </nav>
       </article>
