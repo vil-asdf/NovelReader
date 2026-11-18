@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="forest">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novel Reader — English Edition</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button id="toggle-sidebar" class="icon-btn" title="Table of Contents" aria-label="Table of Contents">☰</button>
+      <div class="book-meta">
+        <h1 id="novel-title">Novel Title</h1>
+        <span id="novel-author" class="subtitle">Author Name</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button id="bookmark-btn" class="icon-btn" title="Bookmark Chapter" aria-label="Bookmark Chapter">☆</button>
+      <button id="toggle-settings" class="icon-btn" title="Reader Settings" aria-label="Reader Settings">Aa</button>
+    </div>
+  </header>
+
+  <div id="settings-panel" class="settings-panel hidden">
+    <div class="setting-group">
+      <label>Theme</label>
+      <div class="theme-options">
+        <button class="theme-btn" data-theme="light">Light</button>
+        <button class="theme-btn active" data-theme="forest">Forest</button>
+        <button class="theme-btn" data-theme="dark">Dark</button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <label>Font Family</label>
+      <select id="font-family-select">
+        <option value="Georgia, 'Times New Roman', serif" selected>Serif (Georgia)</option>
+        <option value="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Sans-Serif</option>
+        <option value="'Courier New', Courier, monospace">Monospace</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>Font Size: <span id="font-size-val">20</span>px</label>
+      <div class="font-size-controls">
+        <button id="font-dec" class="small-btn">A-</button>
+        <button id="font-inc" class="small-btn">A+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside id="sidebar" class="sidebar hidden">
+      <div class="sidebar-header">
+        <h2>Chapters</h2>
+        <button id="close-sidebar" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" data-tab="all">All</button>
+        <button class="tab-btn" data-tab="bookmarks">Bookmarks</button>
+      </div>
+      <ul id="chapter-list" class="chapter-list"></ul>
+    </aside>
+
+    <main id="reader-container" class="reader-container">
+      <div id="welcome-screen" class="welcome-screen">
+        <h2 id="welcome-title">Novel Title</h2>
+        <p id="welcome-author" class="subtitle">By Author Name</p>
+        <p id="welcome-synopsis" class="synopsis">Synopsis will appear here once configured in data/chapters.json.</p>
+        <button id="start-reading-btn" class="primary-btn">Start Reading</button>
+      </div>
+
+      <article id="reader-view" class="reader-view hidden">
+        <div class="chapter-header">
+          <span id="chapter-number" class="chapter-tag">Chapter 1</span>
+          <h2 id="chapter-title">Chapter Title</h2>
+        </div>
+        <div id="chapter-content" class="chapter-content"></div>
+        <nav class="chapter-nav">
+          <button id="prev-chapter" class="nav-btn">← Previous</button>
+          <span id="progress-indicator" class="progress-text">1 / 1</span>
+          <button id="next-chapter" class="nav-btn">Next →</button>
+        </nav>
+      </article>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
